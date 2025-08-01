@@ -58,6 +58,7 @@ typedef struct {
       double C01;
       double C10;
       double C11;
+      double deviation;
 } LSE;
 
 typedef enum {
@@ -67,8 +68,8 @@ typedef enum {
       PP = 3,
 } RS;
 
-LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon);
-int lse_compute(LSE *self, double complex E, double C[4], RS rs);
+LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon, double devi);
+int lse_compute(LSE *self, double complex E, double C[4], RS rs, double devi);
 void lse_free(LSE *self);
 double complex *lse_get_g_data(LSE *self);
 void lse_get_g_size(LSE *self, unsigned int *rows, unsigned int *cols);
@@ -94,10 +95,10 @@ double *minimize(LSE *lse, double C[4]);
 int lse_gmat(LSE *self);
 int lse_vmat(LSE *self);
 int lse_tmat(LSE *self);
-double complex lse_detImVG(LSE *self, double complex E, double C[4], RS rs);
-double complex lse_detVG(LSE *self, double complex E, double C[4], RS rs);
+double complex lse_detImVG(LSE *self, double complex E, double C[4], RS rs, double devi);
+double complex lse_detVG(LSE *self, double complex E, double C[4], RS rs, double devi);
 double lse_cost(LSE *self, double C[4], RS rs);
-void lse_refresh(LSE *self, double complex E, double C[4], RS rs);
+void lse_refresh(LSE *self, double complex E, double C[4], RS rs, double devi);
 void lse_X(LSE *self);
 void lse_XtX(LSE *self);
 
@@ -132,38 +133,38 @@ static inline double Ctct_11(double g_C) { return g_C; }
 	    if (cabs(pprime) <= 1e-8) {                                                                                        \
 		  pprime += 1e-6;                                                                                              \
 	    }                                                                                                                  \
-	    return 4 * fsquare(g_b) / fsquare(f_pi) * -1. / 4. / p / pprime *                                                 \
+	    return 4 * fsquare(g_b) / fsquare(f_pi) * -1. / 4. / p / pprime *                                                  \
 		   (clog((E - (m + csquare(p - pprime) / 2 / m) - omega_##suffix(p, pprime)) /                                 \
 			 (E - (m + csquare(p + pprime) / 2 / m) - omega_##suffix(p, pprime))) +                                \
 		    clog((E - (m + csquare(p - pprime) / 2 / m) - omegaprime_##suffix(p, pprime)) /                            \
 			 (E - (m + csquare(p + pprime) / 2 / m) - omegaprime_##suffix(p, pprime))));                           \
       }
 
-DEFINE_O_FUNCTION(00);
-DEFINE_O_FUNCTION(01);
-DEFINE_O_FUNCTION(10);
-DEFINE_O_FUNCTION(11);
+// DEFINE_O_FUNCTION(00);
+// DEFINE_O_FUNCTION(01);
+// DEFINE_O_FUNCTION(10);
+// DEFINE_O_FUNCTION(11);
 
-static inline double complex V_OME_00(double complex E, double complex p, double complex pprime)
-{
-      return -3 * (3 * O_00(E, p, pprime, m_pi) + O_00(E, p, pprime, m_eta) / 3);
-}
-
-static inline double complex V_OME_01(double complex E, double complex p, double complex pprime)
-{
-      return pow(2, 3. / 2) * O_01(E, p, pprime, m_K);
-}
-
-static inline double complex V_OME_10(double complex E, double complex p, double complex pprime)
-{
-      return pow(2, 3. / 2) * O_10(E, p, pprime, m_K);
-}
-
-static inline double complex V_OME_11(double complex E, double complex p, double complex pprime)
-{
-      return 2. / 3 * O_11(E, p, pprime, m_eta);
-}
-
+// static inline double complex V_OME_00(double complex E, double complex p, double complex pprime)
+// {
+//       return -3 * (3 * O_00(E, p, pprime, m_pi) + O_00(E, p, pprime, m_eta) / 3);
+// }
+//
+// static inline double complex V_OME_01(double complex E, double complex p, double complex pprime)
+// {
+//       return pow(2, 3. / 2) * O_01(E, p, pprime, m_K);
+// }
+//
+// static inline double complex V_OME_10(double complex E, double complex p, double complex pprime)
+// {
+//       return pow(2, 3. / 2) * O_10(E, p, pprime, m_K);
+// }
+//
+// static inline double complex V_OME_11(double complex E, double complex p, double complex pprime)
+// {
+//       return 2. / 3 * O_11(E, p, pprime, m_eta);
+// }
+//
 double complex V_QM_00(LSE *self, size_t p, size_t pprime);
 double complex V_QM_01(LSE *self, size_t p, size_t pprime);
 double complex V_QM_10(LSE *self, size_t p, size_t pprime);
@@ -249,7 +250,7 @@ static inline double complex V_curlOME_11(double complex E, double complex p, do
       {                                                                                                                        \
 	    auto E = self->E;                                                                                                  \
 	    E += m11 + m12;                                                                                                    \
-	    return OMEANA_##suffix( E, p, pprime) ;                                       \
+	    return OMEANA_##suffix(E, p, pprime, self->deviation);                                                             \
       }
 
 DEFINE_V_FUNCTION(00);

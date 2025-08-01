@@ -144,5 +144,5 @@ double complex juliana(double complex E, double complex p, double complex pprime
       // return ret/B/B;
       // return -(p*p+pprime*pprime)*Delta0_00(E, p, pprime, m_pi) + 2*p*pprime*Delta1_00(E, p, pprime, m_pi);
       // return -Delta1_00(E, p, pprime, m_pi);
-      return ANA_00(E, p, pprime, m_pi);
+      return ANA_00(E, p, pprime, m_pi, 0);
 }

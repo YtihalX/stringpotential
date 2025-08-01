@@ -23,6 +23,7 @@ double complex *traceG(double *E, size_t len, double C[4], size_t pNgauss, doubl
 double complex *Det(double *E, size_t len, double C[4], size_t pNgauss, double Lambda, double epsilon);
 double complex *Both(double *E, size_t len, double C[4], size_t pNgauss, double Lambda, double epsilon);
 double complex V(struct OME *ome, double E, double p, double pprime);
+double complex *mass(double *M, size_t len, double E, double C[4], size_t pNgauss, double Lambda, double epsilon);
 struct OME* ome_malloc();
 void Evec(double *, double);
 void Ntower(size_t *);
@@ -72,5 +73,6 @@ int det(void *arg);
 int both(void *arg);
 int poles(void *arg);
 int cst(void *arg);
+int ma(void *arg);
 
 #endif // !SCRIPT_H

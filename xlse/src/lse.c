@@ -32,13 +32,14 @@ DEFINE_VQM(0, 1)
 DEFINE_VQM(1, 0)
 DEFINE_VQM(1, 1)
 
-LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon)
+LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon, double devi)
 {
       LSE *self = malloc(sizeof(LSE));
       if (!self)
 	    return NULL;
 
       const size_t n = 2 * (pNgauss + 1);
+      self->deviation = devi;
 
       ome_build(&self->ome);
       self->wf = WFnew(partialwave, RLAMBDA, RNGAUSS);
@@ -136,9 +137,10 @@ LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon)
 }
 
 // Refresh LSE parameters
-void lse_refresh(LSE *self, double complex E, double C[4], RS rs)
+void lse_refresh(LSE *self, double complex E, double C[4], RS rs, double devi)
 {
       // self->Lambda = Lambda;
+      self->deviation = devi;
       self->E = E;
       self->V0 = C[0];
       self->C00 = C[1];
@@ -600,9 +602,9 @@ double complex *lse_get_iivg_data(LSE *self)
       return (double complex *)self->reg->data;
 }
 
-double complex lse_detImVG(LSE *self, double complex E, double C[4], RS rs)
+double complex lse_detImVG(LSE *self, double complex E, double C[4], RS rs, double devi)
 {
-      lse_refresh(self, E, C, rs);
+      lse_refresh(self, E, C, rs, devi);
       lse_gmat(self);
       lse_vmat(self);
       const size_t n = 2 * (self->pNgauss + 1);
@@ -646,9 +648,9 @@ double complex lse_detImVG(LSE *self, double complex E, double C[4], RS rs)
       return gsl_linalg_complex_LU_det(I_minus_VG, signum);
 }
 
-double complex lse_detVG(LSE *self, double complex E, double C[4], RS rs)
+double complex lse_detVG(LSE *self, double complex E, double C[4], RS rs, double devi)
 {
-      lse_refresh(self, E, C, rs);
+      lse_refresh(self, E, C, rs, devi);
       lse_gmat(self);
       lse_vmat(self);
       const size_t n = 2 * (self->pNgauss + 1);
@@ -679,16 +681,16 @@ double complex lse_detVG(LSE *self, double complex E, double C[4], RS rs)
 
 double lse_cost(LSE *self, double C[4], RS rs)
 {
-      double res = cabs(lse_detImVG(self, m_Xb11P, C, rs));
-      res += cabs(lse_detImVG(self, m_Xb12P, C, rs));
-      res += cabs(lse_detImVG(self, m_Xb13P, C, rs));
+      double res = cabs(lse_detImVG(self, m_Xb11P, C, rs, 0));
+      res += cabs(lse_detImVG(self, m_Xb12P, C, rs, 0));
+      res += cabs(lse_detImVG(self, m_Xb13P, C, rs, 0));
       return res;
 }
 
 // Run the LSE solver
-int lse_compute(LSE *self, double complex E, double C[4], RS rs)
+int lse_compute(LSE *self, double complex E, double C[4], RS rs, double devi)
 {
-      lse_refresh(self, E, C, rs);
+      lse_refresh(self, E, C, rs, devi);
       if (lse_gmat(self) != 0)
 	    return -1;
       if (lse_vmat(self) != 0)
@@ -764,7 +766,7 @@ int detImVG(const gsl_vector *x, void *params, gsl_vector *f)
 {
       struct detparams *detp = params;
       double complex E = gsl_vector_get(x, 0) + gsl_vector_get(x, 1) * I;
-      auto det = lse_detImVG(detp->lse, E, detp->C, detp->rs);
+      auto det = lse_detImVG(detp->lse, E, detp->C, detp->rs, 0);
       gsl_vector_set(f, 0, creal(det));
       gsl_vector_set(f, 1, cimag(det));
       return GSL_SUCCESS;

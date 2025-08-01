@@ -182,7 +182,7 @@ struct OME *ome_malloc()
       return ome;
 }
 
-double complex V(struct OME *ome, double E, double p, double pprime) { return OMEANA_00(E, p, pprime); }
+double complex V(struct OME *ome, double E, double p, double pprime) { return OMEANA_00(E, p, pprime, 0); }
 
 double complex *traceG(double *E, size_t len, double C[4], size_t pNgauss, double Lambda, double epsilon)
 {
@@ -248,6 +248,42 @@ double complex *Det(double *E, size_t len, double C[4], size_t pNgauss, double L
       }
       for (size_t i = 0; i < NTHREADS; i += 1) {
 	    thrd_create(&tid[i], det, &args[i]);
+      }
+      for (size_t i = 0; i < NTHREADS; i += 1) {
+	    thrd_join(tid[i], NULL);
+      }
+      return res;
+}
+
+double complex *mass(double *M, size_t len, double E, double C[4], size_t pNgauss, double Lambda, double epsilon)
+{
+      double complex *res = malloc(sizeof(double complex) * len);
+      thrd_t tid[NTHREADS];
+      argstruct args[NTHREADS];
+      size_t ntasks = len / NTHREADS;
+      size_t residue = len % NTHREADS;
+      for (size_t i = 0; i < NTHREADS; i += 1) {
+	    args[i].pNgauss = pNgauss;
+	    args[i].Lambda = Lambda;
+	    args[i].epsilon = epsilon;
+	    args[i].res = res;
+	    args[i].rs = PP;
+	    args[i].E = M;
+	    args[i].id = i;
+	    for (size_t cc = 0; cc < 4; cc += 1) {
+		  args[i].C[cc] = C[cc];
+	    }
+	    args[i].C[0] = E;
+	    if (i < residue) {
+		  args[i].len = ntasks + 1;
+		  args[i].start = (ntasks + 1) * i;
+	    } else {
+		  args[i].len = ntasks;
+		  args[i].start = ntasks * i + residue;
+	    }
+      }
+      for (size_t i = 0; i < NTHREADS; i += 1) {
+	    thrd_create(&tid[i], ma, &args[i]);
       }
       for (size_t i = 0; i < NTHREADS; i += 1) {
 	    thrd_join(tid[i], NULL);
@@ -343,7 +379,7 @@ double complex *Poles(double *Er, size_t rlen, double *Ei, size_t ilen, double C
 
 double *Fit(double C[4], size_t pNgauss, double Lambda, double epsilon)
 {
-      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(pNgauss, Lambda, epsilon);
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(pNgauss, Lambda, epsilon, 0);
       return minimize(lse, C);
 }
 
@@ -384,7 +420,7 @@ void ose_free(onshellElements ose) { free(ose.ose00); }
 int oT(void *arg)
 {
       argstruct foo = *(argstruct *)arg;
-      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon, 0);
       size_t ngauss = foo.pNgauss;
       onshellElements *res = (onshellElements *)foo.res;
       double complex *ose00 = (double complex *)res->ose00;
@@ -393,7 +429,7 @@ int oT(void *arg)
       double complex *ose11 = (double complex *)res->ose11;
       // printf("start: %lu, len: %lu\n", foo.start, foo.len);
       for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
-	    lse_compute(lse, foo.E[i], foo.C, foo.rs);
+	    lse_compute(lse, foo.E[i], foo.C, foo.rs, 0);
 // printf("%f\n", foo.E[i]);
 #ifdef TPO
 	    lse_X(lse);
@@ -424,7 +460,7 @@ int oT(void *arg)
 int oG(void *arg)
 {
       argstruct foo = *(argstruct *)arg;
-      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon, 0);
       size_t ngauss = foo.pNgauss;
       onshellElements *res = (onshellElements *)foo.res;
       double complex *ose00 = (double complex *)res->ose00;
@@ -433,7 +469,7 @@ int oG(void *arg)
       double complex *ose11 = (double complex *)res->ose11;
       // printf("start: %lu, len: %lu\n", foo.start, foo.len);
       for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
-	    lse_refresh(lse, foo.E[i], foo.C, foo.rs);
+	    lse_refresh(lse, foo.E[i], foo.C, foo.rs, 0);
 	    lse_gmat(lse);
 	    auto G = (double complex(*)[2 * ngauss + 2]) lse->G->data;
 	    ose00[i] = G[ngauss][ngauss];
@@ -455,7 +491,7 @@ int oG(void *arg)
 int oV(void *arg)
 {
       argstruct foo = *(argstruct *)arg;
-      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon, 0);
       size_t ngauss = foo.pNgauss;
       if (foo.id == 0) {
 	    printf("%f\n", lse->xi[0]);
@@ -487,7 +523,7 @@ int oV(void *arg)
 int oTV(void *arg)
 {
       argstruct foo = *(argstruct *)arg;
-      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon, 0);
       // auto buf = (double complex *)foo.res;
       auto buf = (double complex(*)[4][foo.size])foo.res;
       size_t pNgauss = foo.pNgauss;
@@ -497,7 +533,7 @@ int oTV(void *arg)
       // }
       // puts("");
       for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
-	    lse_compute(lse, foo.E[i], foo.C, foo.rs);
+	    lse_compute(lse, foo.E[i], foo.C, foo.rs, 0);
 	    auto T = (double complex(*)[2 * pNgauss + 2]) lse->TOME->data;
 	    auto V = (double complex(*)[2 * pNgauss + 2]) lse->VOME->data;
 	    // printf("thread %lu, i %lu, det[i] %.1f\n", foo.id, i,
@@ -517,12 +553,23 @@ int oTV(void *arg)
 int det(void *arg)
 {
       argstruct foo = *(argstruct *)arg;
-      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon, 0);
       double complex *res = (double complex *)foo.res;
       for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
-	    res[i] = lse_detImVG(lse, foo.E[i], foo.C, PP);
+	    res[i] = lse_detImVG(lse, foo.E[i], foo.C, PP, 0);
 	    // lse_compute(lse, foo.E[i], foo.rs);
 	    // res[i] = lse->det;
+      }
+      return 0;
+}
+
+int ma(void *arg)
+{
+      auto foo = *(argstruct *)arg;
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon, 0);
+      double complex *res = (double complex *)foo.res;
+      for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
+	    res[i] = lse_detImVG(lse, foo.C[0], foo.C, PP, foo.E[i]);
       }
       return 0;
 }
@@ -530,7 +577,7 @@ int det(void *arg)
 int both(void *arg)
 {
       argstruct foo = *(argstruct *)arg;
-      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon, 0);
       auto buf = (double complex *)foo.res;
       size_t pNgauss = foo.pNgauss;
       // printf("thread %lu, foo.res %p\n", foo.id, foo.res);
@@ -539,7 +586,7 @@ int both(void *arg)
       // }
       // puts("");
       for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
-	    lse_compute(lse, foo.E[i], foo.C, foo.rs);
+	    lse_compute(lse, foo.E[i], foo.C, foo.rs, 0);
 	    auto res = buf + 5 * i;
 	    auto T = (double complex(*)[2 * pNgauss + 2]) lse->TOME->data;
 	    // printf("thread %lu, i %lu, det[i] %.1f\n", foo.id, i,
@@ -557,7 +604,7 @@ int poles(void *arg)
 {
       auto foo = *(struct polestruct *)arg;
       size_t len = foo.ilen * foo.rlen;
-      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon, 0);
       double complex *res = foo.res;
       for (size_t idx = foo.start; idx < foo.start + foo.len; idx += 1) {
 	    size_t re = idx / foo.ilen;
@@ -574,7 +621,7 @@ int poles(void *arg)
 int cst(void *arg)
 {
       auto foo = *(argstruct *)arg;
-      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon, 0);
       double *res = foo.res;
       double C[4] = { 0 };
       C[0] = -1.010589943548671;
@@ -589,11 +636,11 @@ int cst(void *arg)
 int trG(void *arg)
 {
       auto foo = *(argstruct *)arg;
-      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
+      LSE *lse [[gnu::cleanup(lsefree)]] = lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon, 0);
       auto res = (double complex(*)[foo.size])foo.res;
       auto pNgauss = foo.pNgauss;
       for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
-	    lse_refresh(lse, foo.E[i], foo.C, foo.rs);
+	    lse_refresh(lse, foo.E[i], foo.C, foo.rs, 0);
 	    lse_gmat(lse);
 	    auto G = (double complex(*)[2 * pNgauss + 2]) lse->G->data;
 	    for (size_t ch = 0; ch < 2; ch += 1) {

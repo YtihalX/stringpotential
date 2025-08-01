@@ -1,4 +1,5 @@
 using Libdl
+using Serialization
 using Polynomials
 using LinearAlgebra
 
@@ -6,6 +7,12 @@ using LinearAlgebra
 const libscript = Libdl.dlopen(joinpath(@__DIR__, "build/linux/x86_64/release/libscript.so"))
 using Plots
 using LaTeXStrings
+
+default(
+      minorgrid=true,
+      minorticks=5,
+      dpi=400
+)
 
 include("constants.jl")
 
@@ -120,13 +127,38 @@ function detImVG(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, e
       vline!([m_Xb13P], s=:dash, label=L"\chi_{b1}(3P)")
       # vline!([m_pi + m_B - m_B_star], s=:dash, label=L"\pi")
       # vline!([m_pi], s=:dash, label=L"m_\pi")
-      plot!(E, abs.(Det), label=L"|det($1-VG$)|", dpi=400)
+      plot!(E, abs.(Det), label=L"|det($I-VG$)|", dpi=400)
       xlims!(E[1], E[end])
       # ylims!(0, 1e5)
       xlabel!("E/GeV")
       # ylims!(0, 1e9)
       savefig("det.png")
       savefig("det.pdf")
+      cfree(reinterpret(Ptr{Cvoid}, dtr))
+      return Det
+end
+
+function mass(M::Vector{Cdouble}, len, E, C::Vector{Cdouble}, pNgauss, Lambda, epsilon)
+      @time dtr = ccall(Libdl.dlsym(libscript, :mass), Ptr{ComplexF64}, (Ptr{Cdouble}, Cuint, Cdouble, Ptr{Cdouble}, Cuint, Cdouble, Cdouble), M, len, E, C, pNgauss, Lambda, epsilon)
+      Det = copy(unsafe_wrap(Array, dtr, len, own=false))
+      plot(M, abs.(Det), label=L"|det($I-VG$)|", dpi=400, grid=true, xminorticks=5, minorgrid=true)
+      # vline!([0], label="physical value: 5.27934GeV", s=:dash, c=:grey)
+      # level = getEvec(C[1])
+      # vls = filter(e -> e > M[1] && e < M[end], level)
+      # vline(vls, s=:dash, c=:grey, label=L"$E_i$")
+      # vline!(delta, s=:dash, label="thresholds", lw=0.8)
+      # vline!([m_Xb11P], s=:dash, label=L"\chi_{b1}(1P)")
+      # vline!([m_Xb12P], s=:dash, label=L"\chi_{b1}(2P)")
+      # vline!([m_Xb13P], s=:dash, label=L"\chi_{b1}(3P)")
+      # vline!([m_pi + m_B - m_B_star], s=:dash, label=L"\pi")
+      # vline!([m_pi], s=:dash, label=L"m_\pi")
+      # xlims!(M[1], 500)
+      # ylims!(0, 2e5)
+      xlabel!(L"x"*"/recoil term")
+      title!("E = $(E)")
+      # ylims!(0, 1e9)
+      savefig("mass.png")
+      savefig("mass.pdf")
       cfree(reinterpret(Ptr{Cvoid}, dtr))
       return Det
 end
@@ -266,7 +298,7 @@ if "--poles" in ARGS
       # savefig("tmp.png")
 end
 onshellRange = LinRange(m_Xb11P - 0.3, delta[1], 3000)
-onshellRange = LinRange(-2.7, 0.690229863, 8000)
+onshellRange = LinRange(-0.7, 1.690229863, 8000)
 
 if "--onshellT" in ARGS
       # E = 1.48:0.00001:1.499
@@ -453,4 +485,14 @@ if "--analyticity" in ARGS
       # ylims!(-0.05, 0.05)
       @time savefig(p, "complex.png")
 
+end
+
+if "--mass" in ARGS
+      mrange = LinRange(0., 1, 2000)
+      x = mrange
+      # x = (1 ./ (1 .- mrange) .- 1 .+ m_B) ./ m_B
+      # println(x[1])
+      # x = LinRange(0., m_B + 2, 2000)
+      det = mass(collect(x), length(x), 1.3, C, pNgauss, Lambda, epsi)
+      # serialize("recoil.dat", det)
 end
