@@ -747,3 +747,7 @@ double complex *getIntegrand() {
     }
     return res;
 }
+
+double complex Gamma(double complex E, double complex p) {
+	return Gamma0(E, p);
+}

@@ -34,4 +34,6 @@ static inline double complex xlog(double complex x) {
     }
     return res;
 }
+
+static inline double complex xcube(double complex x) { return x * x * x; }
 #endif // UTILS_H

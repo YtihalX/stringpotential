@@ -37,7 +37,7 @@ LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon) {
     if (!self)
         return NULL;
 
-    const size_t n = 2 * (pNgauss + 1);
+    const size_t n = NCHANNELS * (pNgauss + 1);
 
     self->ome.set = 0;
     ome_build(&self->ome);
@@ -89,7 +89,7 @@ LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon) {
                                       self->table);
     }
     self->psi_n_mat =
-        malloc(sizeof(double complex) * 2 * (N_MAX + 1) * (pNgauss + 1));
+        malloc(sizeof(double complex) * NCHANNELS * (N_MAX + 1) * (pNgauss + 1));
     double complex(*psi)[N_MAX + 1][pNgauss + 1] = self->psi_n_mat;
 #ifdef TESTQM
     for (size_t i = 0; i < N_MAX; i += 1) {
@@ -104,14 +104,16 @@ LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon) {
             psi[0][i][pi] = 1;
         }
         memcpy(psi[1][i], psi[0][i], sizeof(double complex) * pNgauss);
+        memcpy(psi[2][i], psi[0][i], sizeof(double complex) * pNgauss);
     }
 #else
     for (size_t i = 0; i < N_MAX; i += 1) {
         psi_n_ft_batch(self->wf, self->xi, psi[0][i], pNgauss, i + 1);
         memcpy(psi[1][i], psi[0][i], sizeof(double complex) * pNgauss);
+        memcpy(psi[2][i], psi[0][i], sizeof(double complex) * pNgauss);
     }
 #endif
-    for (size_t ch = 0; ch < 2; ch += 1) {
+    for (size_t ch = 0; ch < NCHANNELS; ch += 1) {
         for (size_t pi = 0; pi < pNgauss + 1; pi += 1) {
             psi[ch][N_MAX][pi] = 1;
         }
@@ -139,7 +141,7 @@ LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon) {
 }
 
 // Refresh LSE parameters
-void lse_refresh(LSE *self, double complex E, double C[4], RS rs) {
+void lse_refresh(LSE *self, double complex E, double C[NCHANNELS*NCHANNELS], RS rs) {
     // self->Lambda = Lambda;
     self->E = E;
     self->V0 = C[0];
@@ -167,7 +169,7 @@ void lse_refresh(LSE *self, double complex E, double C[4], RS rs) {
 #endif /* ifdef TPO                                                              \
                                                                                \ \
    */
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < NCHANNELS; i++) {
         const double complex dE = E - delta[i];
         const double mU = mu[i];
         const double complex tmp = csqrt(2 * mU * dE);
@@ -220,7 +222,7 @@ void lse_free(LSE *self) {
 int lse_gmat(LSE *self) {
     matrix_set_zero(self->G);
 
-    for (size_t i = 0; i < 2; i++) {
+    for (size_t i = 0; i < NCHANNELS; i++) {
         const double complex dE = self->E - delta[i];
         const double mU = mu[i];
         const double complex x0 = self->x0[i];
@@ -410,7 +412,7 @@ int lse_vmat(LSE *self) {
 // Calculate T matrix
 //
 int lse_tmat(LSE *self) {
-    const size_t n = 2 * (self->pNgauss + 1);
+    const size_t n = NCHANNELS * (self->pNgauss + 1);
 
     // Step 1: Compute VG = V * G
     gsl_matrix_complex *VG [[gnu::cleanup(matfree)]] =

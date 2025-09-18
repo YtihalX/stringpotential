@@ -26,6 +26,7 @@ Erange = LinRange(-0.37, 0.5, 1000)
 
 V(E, p, pprime) = ccall(dlsym(libscript, :V), ComplexF64, (Cdouble, ComplexF64, ComplexF64), E, p, pprime)
 Vquad(E, p, pprime) = ccall(dlsym(libscript, :Vquad), ComplexF64, (Cdouble, ComplexF64, ComplexF64), E, p, pprime)
+Gamma(E, p) = ccall(dlsym(libscript, :Gamma), ComplexF64, (ComplexF64, ComplexF64), E, p)
 function integrand(e, p1, p2, x)
     A = p1^2 + p2^2 + m_pi^2
     B = 2 * p1 * p2
