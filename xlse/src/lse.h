@@ -179,8 +179,13 @@ DEFINE_V_TEST(1, 1)
 
 DEFINE_V_FUNCTION(00);
 DEFINE_V_FUNCTION(01);
+DEFINE_V_FUNCTION(02);
 DEFINE_V_FUNCTION(10);
 DEFINE_V_FUNCTION(11);
+DEFINE_V_FUNCTION(12);
+DEFINE_V_FUNCTION(20);
+DEFINE_V_FUNCTION(21);
+DEFINE_V_FUNCTION(22);
 
 #define DEFINE_EFFMOM(alpha, beta)                                             \
     static inline double complex effmom##alpha##beta(double complex E,         \

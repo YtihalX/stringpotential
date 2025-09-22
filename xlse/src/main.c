@@ -360,9 +360,9 @@ double complex Ofunc(double complex E, double complex p,
                 (E - (m + csquare(p - pprime) / 2 / m) - omega_00(p, pprime)) /
                 (E - (m + csquare(p + pprime) / 2 / m) - omega_00(p, pprime))) +
             clog((E - (m + csquare(p - pprime) / 2 / m) -
-                  omegaprime_00(p, pprime)) /
+                  omegastar_00(p, pprime)) /
                  (E - (m + csquare(p + pprime) / 2 / m) -
-                  omegaprime_00(p, pprime))));
+                  omegastar_00(p, pprime))));
 }
 
 void unitest() {

@@ -88,8 +88,8 @@ LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon) {
         gsl_integration_glfixed_point(0, Lambda, i, &self->xi[i], &self->wi[i],
                                       self->table);
     }
-    self->psi_n_mat =
-        malloc(sizeof(double complex) * NCHANNELS * (N_MAX + 1) * (pNgauss + 1));
+    self->psi_n_mat = malloc(sizeof(double complex) * NCHANNELS * (N_MAX + 1) *
+                             (pNgauss + 1));
     double complex(*psi)[N_MAX + 1][pNgauss + 1] = self->psi_n_mat;
 #ifdef TESTQM
     for (size_t i = 0; i < N_MAX; i += 1) {
@@ -141,7 +141,8 @@ LSE *lse_malloc(size_t pNgauss, double Lambda, double epsilon) {
 }
 
 // Refresh LSE parameters
-void lse_refresh(LSE *self, double complex E, double C[NCHANNELS*NCHANNELS], RS rs) {
+void lse_refresh(LSE *self, double complex E, double C[NCHANNELS * NCHANNELS],
+                 RS rs) {
     // self->Lambda = Lambda;
     self->E = E;
     self->V0 = C[0];
@@ -171,7 +172,7 @@ void lse_refresh(LSE *self, double complex E, double C[NCHANNELS*NCHANNELS], RS 
    */
     for (int i = 0; i < NCHANNELS; i++) {
         const double complex dE = E - delta[i];
-        const double mU = mu[i];
+        const double complex mU = mu[i];
         const double complex tmp = csqrt(2 * mU * dE);
         if (((rs >> i) & 1) == 1) {
             self->x0[i] = tmp;
@@ -224,7 +225,7 @@ int lse_gmat(LSE *self) {
 
     for (size_t i = 0; i < NCHANNELS; i++) {
         const double complex dE = self->E - delta[i];
-        const double mU = mu[i];
+        const double complex mU = mu[i];
         const double complex x0 = self->x0[i];
         double complex int_val = 0 + 0 * I;
         for (size_t j = 0; j < self->pNgauss; j++) {
@@ -282,35 +283,35 @@ int lse_vmat(LSE *self) {
     size_t pNgauss = self->pNgauss;
     matrix_set_zero(self->VOME);
 
+#define matrindex(idx, block) ((idx) + (block) * (pNgauss + 1))
+#define setv(idx, jdx, ib, jb)                                                 \
+    matrix_set(self->VOME, matrindex(idx, ib), matrindex(jdx, jb),             \
+               V##ib##jb(self, self->xi[idx], self->xi[jdx], idx, jdx));
+#define setvonr(idx, jdx, ib, jb)                                              \
+    matrix_set(                                                                \
+        self->VOME, matrindex(idx, ib), matrindex(jdx, jb),                    \
+        V##ib##jb(self, self->xi[idx], self->x0[jb], idx, matrindex(jdx, jb)))
+#define setvonl(idx, jdx, ib, jb)                                              \
+    matrix_set(                                                                \
+        self->VOME, matrindex(idx, ib), matrindex(jdx, jb),                    \
+        V##ib##jb(self, self->x0[ib], self->xi[jdx], matrindex(idx, ib), jdx))
+
+#define setvonf(idx, jdx, ib, jb)                                              \
+    matrix_set(self->VOME, matrindex(idx, ib), matrindex(jdx, jb),             \
+               V##ib##jb(self, self->x0[ib], self->x0[jb], matrindex(idx, ib), \
+                         matrindex(jdx, jb)))
+
     for (size_t idx = 0; idx < self->pNgauss; idx++) {
-        double complex p = self->xi[idx];
         for (size_t jdx = 0; jdx < self->pNgauss; jdx++) {
-            double complex pprime = self->xi[jdx];
-
-            // Calculate matrix indices
-            size_t i00 = idx + 0 * (self->pNgauss + 1);
-            size_t j00 = jdx + 0 * (self->pNgauss + 1);
-            size_t i01 = idx + 0 * (self->pNgauss + 1);
-            size_t j01 = jdx + 1 * (self->pNgauss + 1);
-            size_t i10 = idx + 1 * (self->pNgauss + 1);
-            size_t j10 = jdx + 0 * (self->pNgauss + 1);
-            size_t i11 = idx + 1 * (self->pNgauss + 1);
-            size_t j11 = jdx + 1 * (self->pNgauss + 1);
-
-            // Set matrix elements for regular cases
-            matrix_set(self->VOME, i00, j00, V00(self, p, pprime, idx, jdx));
-
-            matrix_set(self->VOME, i01, j01, V01(self, p, pprime, idx, jdx));
-
-            matrix_set(self->VOME, i10, j10, V10(self, p, pprime, idx, jdx));
-
-            matrix_set(self->VOME, i11, j11, V11(self, p, pprime, idx, jdx));
-            // if (idx == 15 && jdx == 8) {
-            //     auto v = V00(self, p, pprime, idx, jdx);
-            //     printf("p: %f%+fim\n", creal(p), cimag(p));
-            //     printf("pprime: %f%+fim\n", creal(pprime), cimag(pprime));
-            //     printf("V: %f%+f\n", creal(v), cimag(v));
-            // }
+            setv(idx, jdx, 0, 0);
+            setv(idx, jdx, 0, 1);
+            setv(idx, jdx, 0, 2);
+            setv(idx, jdx, 1, 0);
+            setv(idx, jdx, 1, 1);
+            setv(idx, jdx, 1, 2);
+            setv(idx, jdx, 2, 0);
+            setv(idx, jdx, 2, 1);
+            setv(idx, jdx, 2, 2);
         }
     }
 
@@ -320,59 +321,30 @@ int lse_vmat(LSE *self) {
     size_t idx = self->pNgauss;
 
     for (size_t jdx = 0; jdx < self->pNgauss; jdx++) {
-        double complex pprime = self->xi[jdx];
-
-        // Calculate matrix indices
-        size_t i00 = idx + 0 * (self->pNgauss + 1);
-        size_t j00 = jdx + 0 * (self->pNgauss + 1);
-        size_t i01 = idx + 0 * (self->pNgauss + 1);
-        size_t j01 = jdx + 1 * (self->pNgauss + 1);
-        size_t i10 = idx + 1 * (self->pNgauss + 1);
-        size_t j10 = jdx + 0 * (self->pNgauss + 1);
-        size_t i11 = idx + 1 * (self->pNgauss + 1);
-        size_t j11 = jdx + 1 * (self->pNgauss + 1);
-
-        // Set matrix elements for edge cases
-        matrix_set(self->VOME, i00, j00,
-                   V00(self, self->x0[0], pprime, pNgauss, jdx));
-
-        matrix_set(self->VOME, i01, j01,
-                   V01(self, self->x0[0], pprime, pNgauss, jdx));
-
-        matrix_set(self->VOME, i10, j10,
-                   V10(self, self->x0[1], pprime, 2 * pNgauss + 1, jdx));
-
-        matrix_set(self->VOME, i11, j11,
-                   V11(self, self->x0[1], pprime, 2 * pNgauss + 1, jdx));
+        setvonl(idx, jdx, 0, 0);
+        setvonl(idx, jdx, 0, 1);
+        setvonl(idx, jdx, 0, 2);
+        setvonl(idx, jdx, 1, 0);
+        setvonl(idx, jdx, 1, 1);
+        setvonl(idx, jdx, 1, 2);
+        setvonl(idx, jdx, 2, 0);
+        setvonl(idx, jdx, 2, 1);
+        setvonl(idx, jdx, 2, 2);
     }
 
     // Case 2: jdx = Ngauss (special x0 value for second dimension)
     size_t jdx = self->pNgauss;
 
     for (size_t idx = 0; idx < self->pNgauss; idx++) {
-        double complex p = self->xi[idx];
-
-        // Calculate matrix indices
-        size_t i00 = idx + 0 * (self->pNgauss + 1);
-        size_t j00 = jdx + 0 * (self->pNgauss + 1);
-        size_t i01 = idx + 0 * (self->pNgauss + 1);
-        size_t j01 = jdx + 1 * (self->pNgauss + 1);
-        size_t i10 = idx + 1 * (self->pNgauss + 1);
-        size_t j10 = jdx + 0 * (self->pNgauss + 1);
-        size_t i11 = idx + 1 * (self->pNgauss + 1);
-        size_t j11 = jdx + 1 * (self->pNgauss + 1);
-
-        // Set matrix elements for edge cases
-        matrix_set(self->VOME, i00, j00,
-                   V00(self, p, self->x0[0], idx, pNgauss));
-        matrix_set(self->VOME, i01, j01,
-                   V01(self, p, self->x0[1], idx, 2 * pNgauss + 1));
-
-        matrix_set(self->VOME, i10, j10,
-                   V10(self, p, self->x0[0], idx, pNgauss));
-
-        matrix_set(self->VOME, i11, j11,
-                   V11(self, p, self->x0[1], idx, 2 * pNgauss + 1));
+        setvonr(idx, jdx, 0, 0);
+        setvonr(idx, jdx, 0, 1);
+        setvonr(idx, jdx, 0, 2);
+        setvonr(idx, jdx, 1, 0);
+        setvonr(idx, jdx, 1, 1);
+        setvonr(idx, jdx, 1, 2);
+        setvonr(idx, jdx, 2, 0);
+        setvonr(idx, jdx, 2, 1);
+        setvonr(idx, jdx, 2, 2);
     }
 
     // Case 3: Both idx = Ngauss and jdx = Ngauss (special x0 values for
@@ -380,32 +352,23 @@ int lse_vmat(LSE *self) {
     idx = self->pNgauss;
     jdx = self->pNgauss;
 
-    // Calculate matrix indices for the corner case
-    size_t i00 = idx + 0 * (self->pNgauss + 1);
-    size_t j00 = jdx + 0 * (self->pNgauss + 1);
-    size_t i01 = idx + 0 * (self->pNgauss + 1);
-    size_t j01 = jdx + 1 * (self->pNgauss + 1);
-    size_t i10 = idx + 1 * (self->pNgauss + 1);
-    size_t j10 = jdx + 0 * (self->pNgauss + 1);
-    size_t i11 = idx + 1 * (self->pNgauss + 1);
-    size_t j11 = jdx + 1 * (self->pNgauss + 1);
+    setvonf(idx, jdx, 0, 0);
+    setvonf(idx, jdx, 0, 1);
+    setvonf(idx, jdx, 0, 2);
+    setvonf(idx, jdx, 1, 0);
+    setvonf(idx, jdx, 1, 1);
+    setvonf(idx, jdx, 1, 2);
+    setvonf(idx, jdx, 2, 0);
+    setvonf(idx, jdx, 2, 1);
+    setvonf(idx, jdx, 2, 2);
 
-    // Set matrix elements for the corner case
-    matrix_set(self->VOME, i00, j00,
-               V00(self, self->x0[0], self->x0[0], pNgauss, pNgauss));
-
-    matrix_set(self->VOME, i01, j01,
-               V01(self, self->x0[0], self->x0[1], pNgauss, 2 * pNgauss + 1));
-
-    matrix_set(self->VOME, i10, j10,
-               V10(self, self->x0[1], self->x0[0], 2 * pNgauss + 1, pNgauss));
-
-    matrix_set(
-        self->VOME, i11, j11,
-        V11(self, self->x0[1], self->x0[1], 2 * pNgauss + 1, 2 * pNgauss + 1));
 #ifdef DEBUG
 #endif /* ifdef DEBUG */
-
+#undef matrindex
+#undef setv
+#undef setvonr
+#undef setvonl
+#undef setvonf
     return 0;
 }
 

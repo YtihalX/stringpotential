@@ -41,77 +41,40 @@ void ome_build(struct OME *self);
 void ome_free(struct OME *self);
 void printp(struct OME *self);
 
-// Omega functions
-static inline double complex omega_00(double complex p, double complex pprime) {
-#ifdef RECOIL
+#define DEFINE_OMEGA(alpha, beta)                                              \
+    static inline double complex omega_##alpha##beta(double complex p1,        \
+                                                     double complex p2) {      \
+        return m_B##alpha + m_B##beta + p1 * p1 / 2 / m_B##alpha +             \
+               p2 * p2 / 2 / m_B##beta;                                        \
+    }
 
-    return 2 * m_B + (p * p + pprime * pprime) / (2 * m_B);
-#else
-    return 2 * m_B;
-#endif // RECOIL
-}
+#define DEFINE_OMEGASTAR(alpha, beta)                                          \
+    static inline double complex omegastar_##alpha##beta(double complex p1,    \
+                                                         double complex p2) {  \
+        return m_B##alpha##_star + m_B##beta##_star +                          \
+               p2 * p2 / 2 / m_B##alpha##_star +                               \
+               p1 * p1 / 2 / m_B##beta##_star;                                 \
+    }
 
-static inline double complex omega_01(double complex p, double complex pprime) {
-#ifdef RECOIL
-    return m_B + pprime * pprime / (2 * m_B) + m_B_s + p * p / (2 * m_B_s);
-#else
-    return m_B + m_B_s;
-#endif
-}
+DEFINE_OMEGA(0, 0);
+DEFINE_OMEGA(0, 1);
+DEFINE_OMEGA(0, 2);
+DEFINE_OMEGA(1, 0);
+DEFINE_OMEGA(1, 1);
+DEFINE_OMEGA(1, 2);
+DEFINE_OMEGA(2, 0);
+DEFINE_OMEGA(2, 1);
+DEFINE_OMEGA(2, 2);
 
-static inline double complex omega_10(double complex p, double complex pprime) {
-#ifdef RECOIL
-    return m_B_s + pprime * pprime / (2 * m_B_s) + m_B + p * p / (2 * m_B);
-#else
-    return m_B_s + m_B;
-#endif
-}
-
-static inline double complex omega_11(double complex p, double complex pprime) {
-#ifdef RECOIL
-    return 2 * m_B_s + (p * p + pprime * pprime) / (2 * m_B_s);
-#else
-    return 2 * m_B_s;
-#endif
-}
-
-static inline double complex omegaprime_00(double complex p,
-                                           double complex pprime) {
-#ifdef RECOIL
-    return 2 * m_B_star + (p * p + pprime * pprime) / (2 * m_B_star);
-#else
-    return 2 * m_B_star;
-#endif
-}
-
-static inline double complex omegaprime_01(double complex p,
-                                           double complex pprime) {
-#ifdef RECOIL
-    return m_B_star + pprime * pprime / (2 * m_B_star) + m_B_star_s +
-           p * p / (2 * m_B_star_s);
-#else
-    return m_B_star + m_B_star_s;
-#endif
-}
-
-static inline double complex omegaprime_10(double complex p,
-                                           double complex pprime) {
-#ifdef RECOIL
-    return m_B_star_s + pprime * pprime / (2 * m_B_star_s) + m_B_star +
-           p * p / (2 * m_B_star);
-#else
-    return m_B_star_s + m_B_star;
-#endif
-}
-
-static inline double complex omegaprime_11(double complex p,
-                                           double complex pprime) {
-#ifdef RECOIL
-    return 2 * m_B_star_s + (p * p + pprime * pprime) / (2 * m_B_star_s);
-#else
-    return 2 * m_B_star_s;
-#endif
-}
+DEFINE_OMEGASTAR(0, 0);
+DEFINE_OMEGASTAR(0, 1);
+DEFINE_OMEGASTAR(0, 2);
+DEFINE_OMEGASTAR(1, 0);
+DEFINE_OMEGASTAR(1, 1);
+DEFINE_OMEGASTAR(1, 2);
+DEFINE_OMEGASTAR(2, 0);
+DEFINE_OMEGASTAR(2, 1);
+DEFINE_OMEGASTAR(2, 2);
 
 static inline double complex Epi(double complex z, double complex p1,
                                  double complex p2, double m0) {
@@ -316,14 +279,13 @@ static inline double complex OME_11(struct OME ome, double complex E,
 
 #define DEFINE_DELTA0(suffix)                                                  \
     static inline double complex Delta0_##suffix(                              \
-        double complex e, double complex p, double complex pprime,             \
-        double m0) {                                                           \
-        auto A = p * p + pprime * pprime + m0 * m0;                            \
-        auto B = 2 * p * pprime;                                               \
-        auto C = omega_##suffix(pprime, p) - e - I * EPSILON;                  \
-        auto D = omegaprime_##suffix(p, pprime) - e - I * EPSILON;             \
-        auto a = Epi(1, p, pprime, m0);                                        \
-        auto b = Epi(-1, p, pprime, m0);                                       \
+        double complex e, double complex p1, double complex p2, double m0) {   \
+        /*auto A = p1 * p1 + p2 * p2 + m0 * m0;*/                                  \
+        auto B = 2 * p1 * p2;                                                  \
+        auto C = omega_##suffix(p1, p2) - e - I * EPSILON;                     \
+        auto D = omegastar_##suffix(p1, p2) - e - I * EPSILON;                 \
+        auto a = Epi(1, p1, p2, m0);                                           \
+        auto b = Epi(-1, p1, p2, m0);                                          \
         auto log1 = (xlog((a + C)) - xlog((b + C))) / B;                       \
         auto log2 = (xlog((a + D)) - xlog((b + D))) / B;                       \
         return -(log1 + log2);                                                 \
@@ -331,14 +293,13 @@ static inline double complex OME_11(struct OME ome, double complex E,
 
 #define DEFINE_DELTA1(suffix)                                                  \
     static inline double complex Delta1_##suffix(                              \
-        double complex E, double complex p, double complex pprime,             \
-        double m0) {                                                           \
-        auto A = p * p + pprime * pprime + m0 * m0;                            \
-        auto B = 2 * p * pprime;                                               \
-        auto C = omega_##suffix(pprime, p) - E - I * EPSILON;                  \
-        auto D = omegaprime_##suffix(p, pprime) - E - I * EPSILON;             \
-        auto a = Epi(1, p, pprime, m0);                                        \
-        auto b = Epi(-1, p, pprime, m0);                                       \
+        double complex E, double complex p1, double complex p2, double m0) {   \
+        auto A = p1 * p1 + p2 * p2 + m0 * m0;                                  \
+        auto B = 2 * p1 * p2;                                                  \
+        auto C = omega_##suffix(p1, p2) - E - I * EPSILON;                     \
+        auto D = omegastar_##suffix(p1, p2) - E - I * EPSILON;                 \
+        auto a = Epi(1, p1, p2, m0);                                           \
+        auto b = Epi(-1, p1, p2, m0);                                          \
         auto log1 = (xlog((a + C)) - xlog((b + C))) / B;                       \
         auto log2 = (xlog((a + D)) - xlog((b + D))) / B;                       \
         auto B0 = B;                                                           \
@@ -348,74 +309,132 @@ static inline double complex OME_11(struct OME ome, double complex E,
     }
 #define DEFINE_ANA(suffix)                                                     \
     static inline double complex ANA_##suffix(                                 \
-        double complex E, double complex p, double complex pprime,             \
-        double m0) {                                                           \
-        return FACPI * (2 * p * pprime * Delta1_##suffix(E, p, pprime, m0) -   \
-                        (p * p + pprime * pprime) *                            \
-                            Delta0_##suffix(E, p, pprime, m0));                \
+        double complex E, double complex p1, double complex p2, double m0) {   \
+        return FACPI * (2 * p1 * p2 * Delta1_##suffix(E, p1, p2, m0) -         \
+                        (p1 * p1 + p2 * p2) * Delta0_##suffix(E, p1, p2, m0)); \
     }
-
-double complex juliana(double complex E, double complex p,
-                       double complex pprime);
 
 DEFINE_DELTA0(00);
 DEFINE_DELTA0(01);
+DEFINE_DELTA0(02);
 DEFINE_DELTA0(10);
 DEFINE_DELTA0(11);
+DEFINE_DELTA0(12);
+DEFINE_DELTA0(20);
+DEFINE_DELTA0(21);
+DEFINE_DELTA0(22);
 
 DEFINE_DELTA1(00);
 DEFINE_DELTA1(01);
+DEFINE_DELTA1(02);
 DEFINE_DELTA1(10);
 DEFINE_DELTA1(11);
+DEFINE_DELTA1(12);
+DEFINE_DELTA1(20);
+DEFINE_DELTA1(21);
+DEFINE_DELTA1(22);
 
 DEFINE_ANA(00);
 DEFINE_ANA(01);
+DEFINE_ANA(02);
 DEFINE_ANA(10);
 DEFINE_ANA(11);
+DEFINE_ANA(12);
+DEFINE_ANA(20);
+DEFINE_ANA(21);
+DEFINE_ANA(22);
 
-static inline double complex OMEANA_00(double complex E, double complex p,
-                                       double complex pprime) {
+static inline double complex OMEANA_00(double complex E, double complex p1,
+                                       double complex p2) {
 #ifdef PIIIII
-    return ANA_00(E, p, pprime, m_pi);
+    return ANA_00(E, p1, p2, m_pi);
 #elif defined(ETA)
-    return ANA_00(E, p, pprime, m_eta);
+    return ANA_00(E, p1, p2, m_eta);
 #else
-    return 3 * ANA_00(E, p, pprime, m_pi) +
-           1. / 3 * ANA_00(E, p, pprime, m_eta);
+    return ANA_00(E, p1, p2, m_pi) + 1. / 3 * ANA_00(E, p1, p2, m_eta);
 #endif
 }
 
-static inline double complex OMEANA_01(double complex E, double complex p,
-                                       double complex pprime) {
+static inline double complex OMEANA_01(double complex E, double complex p1,
+                                       double complex p2) {
 #ifdef PIIIII
-    return ANA_01(E, p, pprime, m_pi);
+    return ANA_01(E, p1, p2, m_pi);
 #elif defined(ETA)
-    return ANA_00(E, p, pprime, m_eta);
+    return ANA_00(E, p1, p2, m_eta);
 #else
-    return 2 * sqrt(2) * ANA_01(E, p, pprime, m_K);
+    return 2 * ANA_01(E, p1, p2, m_K);
 #endif
 }
 
-static inline double complex OMEANA_10(double complex E, double complex p,
-                                       double complex pprime) {
+static inline double complex OMEANA_02(double complex E, double complex p1,
+                                       double complex p2) {
 #ifdef PIIIII
-    return ANA_10(E, p, pprime, m_pi);
+    return ANA_02(E, p1, p2, m_K);
 #elif defined(ETA)
-    return ANA_00(E, p, pprime, m_eta);
+    return ANA_02(E, p1, p2, m_eta);
 #else
-    return 2 * sqrt(2) * ANA_10(E, p, pprime, m_K);
+    return 2 * ANA_02(E, p1, p2, m_K);
+#endif // PIIIII
+}
+
+static inline double complex OMEANA_10(double complex E, double complex p1,
+                                       double complex p2) {
+#ifdef PIIIII
+    return ANA_10(E, p1, p2, m_pi);
+#elif defined(ETA)
+    return ANA_00(E, p1, p2, m_eta);
+#else
+    return 2 * ANA_10(E, p1, p2, m_pi);
 #endif
 }
 
-static inline double complex OMEANA_11(double complex E, double complex p,
-                                       double complex pprime) {
+static inline double complex OMEANA_11(double complex E, double complex p1,
+                                       double complex p2) {
 #ifdef PIIIII
-    return ANA_11(E, p, pprime, m_pi);
+    return ANA_11(E, p1, p2, m_pi);
 #elif defined(ETA)
-    return ANA_00(E, p, pprime, m_eta);
+    return ANA_00(E, p1, p2, m_eta);
 #else
-    return 4. / 3 * ANA_11(E, p, pprime, m_eta);
+    return ANA_11(E, p1, p2, m_pi) + 1. / 3 * ANA_11(E, p1, p2, m_eta);
 #endif
 }
+
+static inline double complex OMEANA_12(double complex E, double complex p1,
+                                       double complex p2) {
+#ifdef PIIIII
+    return ANA_12(E, p1, p2, m_pi);
+#else
+    return 2 * ANA_12(E, p1, p2, m_K);
+#endif // PIIIII
+}
+
+static inline double complex OMEANA_20(double complex E, double complex p1,
+                                       double complex p2) {
+#ifdef PIIIII
+    return ANA_20(E, p1, p2, m_pi);
+#else
+    return 2 * ANA_20(E, p1, p2, m_K);
+#endif // PIIIII
+}
+
+static inline double complex OMEANA_21(double complex E, double complex p1,
+                                       double complex p2) {
+#ifdef PIIIII
+    return ANA_21(E, p1, p2, m_pi);
+#else
+    return 2 * ANA_21(E, p1, p2, m_K);
+#endif // PIIIII
+}
+
+static inline double complex OMEANA_22(double complex E, double complex p1,
+                                       double complex p2) {
+#ifdef PIIIII
+    return ANA_22(E, p1, p2, m_pi);
+#else
+    return 4. / 3 * ANA_22(E, p1, p2, m_eta);
+#endif // PIIIII
+}
+
+double complex juliana(double complex E, double complex p, double complex p2);
 
 #endif // OME_H

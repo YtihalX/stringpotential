@@ -48,7 +48,7 @@ function quadrate(e, p1, p2)
     for i in eachindex(xpath)
         res += integrand(e, p1, p2, xpath[i]) * wpath[i]
     end
-	return res;
+    return res
 end
 
 function EG(p1, p2, m0)
@@ -144,7 +144,7 @@ function imTsing(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, e
     # plot!(E, imag.(invT[2, :]))
     # plot!(E, ρ.(E, 2), label=L"\rho_2(E)\Theta(E-m_{B_s} - m_{B_s^*})")
     vline!(delta, label="thresholds", s=:dash, c=:grey)
-	# vline!([-m_eta^2/2/mu[1]], label=L"m_\eta")
+    # vline!([-m_eta^2/2/mu[1]], label=L"m_\eta")
     # ylims!(-2, 1.5)
     xlabel!("E/GeV")
     savefig("imTsing.png")
@@ -155,7 +155,7 @@ end
 function conshellT(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, epsilon)
     @time otr = ccall(Libdl.dlsym(libscript, :onshellT), Ptr{ComplexF64}, (Ptr{Cdouble}, Cuint, Ptr{Cdouble}, Cuint, Cdouble, Cdouble), E, len, C, pNgauss, Lambda, epsilon)
     yup = 1e2
-    ot = transpose(copy(unsafe_wrap(Array, otr, (len, 4), own=false)))
+    ot = permutedims(copy(unsafe_wrap(Array, otr, (len, 3, 3), own=false)), (3, 2, 1))
     plot(dpi=400, legend=:topleft)
     # level = getEvec(C[1])
     # vls = filter(e -> e > E[1] && e < E[end], level)
@@ -165,9 +165,10 @@ function conshellT(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda,
     vline!([m_Xb12P], s=:dash, label=L"\chi_{b1}(2P)")
     vline!([m_Xb13P], s=:dash, label=L"\chi_{b1}(3P)")
     vline!([m_Xb14P], s=:dash, label=L"\chi_{b1}(4P)")
-    plot!(E, abs.(ot[1, :]), label=L"|$T_{11}$|", dpi=400)
-    plot!(E, abs.(ot[3, :]), label=L"|$T_{21}$|")
-    plot!(E, abs.(ot[4, :]), label=L"|$T_{22}$|")
+    plot!(E, abs.(ot[1, 1, :]), label=L"|$T_{11}$|", dpi=400)
+    # plot!(E, abs.(ot[2, 1, :]), label=L"|$T_{21}$|")
+    plot!(E, abs.(ot[2, 2, :]), label=L"|$T_{22}$|")
+    plot!(E, abs.(ot[3, 3, :]), label=L"|$T_{33}$|")
     annotate!(0.01, -0.075 * yup, text(L"BB^*", 8))
     annotate!(delta[2] + 0.01, -0.075 * yup, text(L"B_sB_s^*", 8))
     # plot!(E, abs.(ot[2, :]), label=L"$T_{12}$")
@@ -298,7 +299,7 @@ end
 
 function detImVG(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, epsilon)
     @time dtr = ccall(Libdl.dlsym(libscript, :Det), Ptr{ComplexF64}, (Ptr{Cdouble}, Cuint, Ptr{Cdouble}, Cuint, Cdouble, Cdouble), E, len, C, pNgauss, Lambda, epsilon)
-    yup = 60
+    yup = 5e3
     Det = copy(unsafe_wrap(Array, dtr, len, own=false))
     # plot(E, real.(Det), label=L"det($1-VG$)",dpi=400)
     # level = getEvec(C[1])

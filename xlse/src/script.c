@@ -27,22 +27,18 @@ double complex *onshellT(double *E, size_t len, double C[4], size_t pNgauss,
     //   printf("%f,  ", E[i]);
     // }
     // puts("");
-    double complex *res = malloc(sizeof(double complex) * len * 4);
-    onshellElements onshellBuf = {
-        .ose00 = res,
-        .ose01 = res + len,
-        .ose10 = res + 2 * len,
-        .ose11 = res + 3 * len,
-    };
+    double complex *res =
+        malloc(sizeof(double complex) * len * NCHANNELS * NCHANNELS);
     thrd_t tid[NTHREADS];
     argstruct args[NTHREADS];
     size_t ntasks = len / NTHREADS;
     size_t residue = len % NTHREADS;
     for (size_t i = 0; i < NTHREADS; i += 1) {
+        args[i].size = len;
         args[i].pNgauss = pNgauss;
         args[i].Lambda = Lambda;
         args[i].epsilon = epsilon;
-        args[i].res = &onshellBuf;
+        args[i].res = res;
         args[i].rs = PP, args[i].E = E;
         args[i].id = i;
         for (size_t cc = 0; cc < 4; cc += 1) {
@@ -455,11 +451,7 @@ int oT(void *arg) {
     LSE *lse [[gnu::cleanup(lsefree)]] =
         lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
     size_t ngauss = foo.pNgauss;
-    onshellElements *res = (onshellElements *)foo.res;
-    double complex *ose00 = (double complex *)res->ose00;
-    double complex *ose01 = (double complex *)res->ose01;
-    double complex *ose10 = (double complex *)res->ose10;
-    double complex *ose11 = (double complex *)res->ose11;
+    double complex(*ose)[NCHANNELS][foo.size] = foo.res;
     // printf("start: %lu, len: %lu\n", foo.start, foo.len);
     for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
         lse_compute(lse, foo.E[i], foo.C, foo.rs);
@@ -473,10 +465,13 @@ int oT(void *arg) {
         ose11[i] = lse->onshellT[1][1];
 #else
         // auto T = (double complex(*)[2 * ngauss + 2]) lse->TOME->data;
-        ose00[i] = matrix_get(lse->TOME, ngauss, ngauss);
-        ose01[i] = matrix_get(lse->TOME, ngauss, 2 * ngauss + 1);
-        ose10[i] = matrix_get(lse->TOME, 2 * ngauss + 1, ngauss);
-        ose11[i] = matrix_get(lse->TOME, 2 * ngauss + 1, 2 * ngauss + 1);
+        for (size_t alpha = 0; alpha < NCHANNELS; alpha += 1) {
+            for (size_t beta = 0; beta < NCHANNELS; beta += 1) {
+                ose[alpha][beta][i] =
+                    matrix_get(lse->TOME, ngauss + alpha * (ngauss + 1),
+                               ngauss + beta * (ngauss + 1));
+            }
+        }
         // size_t idx = ngauss * 2 * (ngauss + 1) + ngauss;
         // ose00[i] = lse->TOME->data[2 * idx] + lse->TOME->data[2 * idx
         // + 1] * I; idx += ngauss + 1; ose01[i] = lse->TOME->data[2 *
@@ -749,5 +744,5 @@ double complex *getIntegrand() {
 }
 
 double complex Gamma(double complex E, double complex p) {
-	return Gamma0(E, p);
+    return Gamma0(E, p);
 }
