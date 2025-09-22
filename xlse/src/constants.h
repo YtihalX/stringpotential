@@ -53,7 +53,7 @@
 #define g1 (gcoupling * 0.006467550544943349)
 // #define g1 (36. / 1000 * 1.4142135623730951)
 #define delta0 0
-#define delta1 (m21 + m22 - m11 - m12)
+#define delta1 (m_B1 + m_B1_star - m_B0 - m_B0_star)
 #define delta2 (m_B2 + m_B2_star - m_B0 - m_B0_star)
 #define mu0 (m_B0 * m_B0_star / (m_B0 + m_B0_star))
 #define mu1 (m_B1 * m_B1_star / (m_B1 + m_B1_star))

@@ -63,7 +63,7 @@ double complex *onshellT(double *E, size_t len, double C[4], size_t pNgauss,
 
 double complex *onshellT_single(double *E, size_t len, double C[4],
                                 size_t pNgauss, double Lambda, double epsilon) {
-    double complex *res = malloc(sizeof(double complex) * len * 2);
+    double complex *res = malloc(sizeof(double complex) * len);
     thrd_t tid[NTHREADS];
     argstruct args[NTHREADS];
     size_t ntasks = len / NTHREADS;
@@ -99,13 +99,8 @@ double complex *onshellT_single(double *E, size_t len, double C[4],
 
 double complex *onshellG(double *E, size_t len, double C[4], size_t pNgauss,
                          double Lambda, double epsilon) {
-    double complex *res = malloc(sizeof(double complex) * len * 4);
-    onshellElements onshellBuf = {
-        .ose00 = res,
-        .ose01 = res + len,
-        .ose10 = res + 2 * len,
-        .ose11 = res + 3 * len,
-    };
+    double complex *res =
+        malloc(sizeof(double complex) * len * NCHANNELS * NCHANNELS);
     thrd_t tid[NTHREADS];
     argstruct args[NTHREADS];
     size_t ntasks = len / NTHREADS;
@@ -114,7 +109,8 @@ double complex *onshellG(double *E, size_t len, double C[4], size_t pNgauss,
         args[i].pNgauss = pNgauss;
         args[i].Lambda = Lambda;
         args[i].epsilon = epsilon;
-        args[i].res = &onshellBuf;
+        args[i].size = len;
+        args[i].res = res;
         args[i].rs = PP, args[i].E = E;
         args[i].id = i;
         for (size_t cc = 0; cc < 4; cc += 1) {
@@ -252,7 +248,7 @@ double complex *V3d(double E, size_t pNgauss, double Lambda, double epsilon) {
 
 double complex *traceG(double *E, size_t len, double C[4], size_t pNgauss,
                        double Lambda, double epsilon) {
-    double complex *res = malloc(sizeof(double complex) * len * 2);
+    double complex *res = malloc(sizeof(double complex) * len * NCHANNELS);
     thrd_t tid[NTHREADS];
     argstruct args[NTHREADS];
     size_t ntasks = len / NTHREADS;
@@ -490,7 +486,7 @@ int oTsing(void *arg) {
     LSE *lse [[gnu::cleanup(lsefree)]] =
         lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
     size_t ngauss = foo.pNgauss;
-    double complex(*res)[foo.size] = foo.res;
+    double complex *res = foo.res;
     // printf("start: %lu, len: %lu\n", foo.start, foo.len);
     for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
         lse_compute_single(lse, foo.E[i], foo.C, foo.rs);
@@ -503,9 +499,7 @@ int oTsing(void *arg) {
         ose10[i] = lse->onshellT[1][0];
         ose11[i] = lse->onshellT[1][1];
 #else
-        auto T = (double complex(*)[2 * ngauss + 2]) lse->TOME->data;
-        res[0][i] = T[ngauss][ngauss];
-        res[1][i] = matrix_get(lse->VOME, ngauss, ngauss);
+        res[i] = matrix_get(lse->VOME, ngauss, ngauss);
         // res[i] = lse->onshellT[0][0];
         // size_t idx = ngauss * 2 * (ngauss + 1) + ngauss;
         // ose00[i] = lse->TOME->data[2 * idx] + lse->TOME->data[2 * idx
@@ -525,20 +519,18 @@ int oG(void *arg) {
     LSE *lse [[gnu::cleanup(lsefree)]] =
         lse_malloc(foo.pNgauss, foo.Lambda, foo.epsilon);
     size_t ngauss = foo.pNgauss;
-    onshellElements *res = (onshellElements *)foo.res;
-    double complex *ose00 = (double complex *)res->ose00;
-    double complex *ose01 = (double complex *)res->ose01;
-    double complex *ose10 = (double complex *)res->ose10;
-    double complex *ose11 = (double complex *)res->ose11;
+    double complex(*ose)[NCHANNELS][foo.size] = foo.res;
     // printf("start: %lu, len: %lu\n", foo.start, foo.len);
     for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
         lse_refresh(lse, foo.E[i], foo.C, foo.rs);
         lse_gmat(lse);
-        auto G = (double complex(*)[2 * ngauss + 2]) lse->G->data;
-        ose00[i] = G[ngauss][ngauss];
-        ose01[i] = G[ngauss][2 * ngauss + 1];
-        ose10[i] = G[2 * ngauss + 1][ngauss];
-        ose11[i] = G[2 * ngauss + 1][2 * ngauss + 1];
+        auto G = (double complex(*)[NCHANNELS * (ngauss + 1)]) lse->G->data;
+        for (size_t alpha = 0; alpha < NCHANNELS; alpha += 1) {
+            for (size_t beta = 0; beta < NCHANNELS; beta += 1) {
+                ose[alpha][beta][i] = G[ngauss + alpha * (ngauss + 1)]
+                                       [ngauss + beta * (ngauss + 1)];
+            }
+        }
         // size_t idx = ngauss * 2 * (ngauss + 1) + ngauss;
         // ose00[i] = lse->TOME->data[2 * idx] + lse->TOME->data[2 * idx
         // + 1] * I; idx += ngauss + 1; ose01[i] = lse->TOME->data[2 *
@@ -567,7 +559,6 @@ int oV(void *arg) {
     for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
         lse_refresh(lse, foo.E[i], foo.C, foo.rs);
         lse_vmat(lse);
-        auto V = (double complex(*)[2 * ngauss + 2]) lse->VOME->data;
         ose00[i] = matrix_get(lse->VOME, ngauss + xoffset, ngauss + yoffset);
         ose01[i] =
             matrix_get(lse->VOME, ngauss + xoffset, 2 * ngauss + 1 + yoffset);
@@ -696,8 +687,8 @@ int trG(void *arg) {
     for (size_t i = foo.start; i < foo.start + foo.len; i += 1) {
         lse_refresh(lse, foo.E[i], foo.C, foo.rs);
         lse_gmat(lse);
-        auto G = (double complex(*)[2 * pNgauss + 2]) lse->G->data;
-        for (size_t ch = 0; ch < 2; ch += 1) {
+        auto G = (double complex(*)[NCHANNELS * (pNgauss + 1)]) lse->G->data;
+        for (size_t ch = 0; ch < NCHANNELS; ch += 1) {
             res[ch][i] = 0;
             for (size_t p = 0; p < pNgauss + 1; p += 1) {
                 res[ch][i] += G[p + ch * (pNgauss + 1)][p + ch * (pNgauss + 1)];

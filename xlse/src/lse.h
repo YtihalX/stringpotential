@@ -173,7 +173,7 @@ DEFINE_V_TEST(1, 1)
                                         size_t ppi) {                          \
         auto E = self->E;                                                      \
         E += m11 + m12;                                                        \
-        auto res = OMEANA_##suffix(E, p, pprime);                              \
+        auto res = cabs(OMEANA_##suffix(E, p, pprime));                              \
         return res;                                                            \
     }
 

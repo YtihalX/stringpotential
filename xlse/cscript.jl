@@ -19,7 +19,7 @@ Lambda = 4.0
 pNgauss = 64
 data = Nothing
 C = [-1.010589943548671, 0, -1.220749787118462, 0]
-Erange = LinRange(-0.37, 0.5, 1000)
+Erange = LinRange(m_Xb11P - 0.1, m_Xb14P + 0.1, 1000)
 # Erange = LinRange(-0.1, 2, 1000)
 # onshellRange = LinRange(-0.7, 0.6, 1000)
 # onshellRange = LinRange(0., 0.190229863, 8000)
@@ -69,8 +69,8 @@ end
 
 function imT(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, epsilon)
     @time otr = ccall(Libdl.dlsym(libscript, :onshellT), Ptr{ComplexF64}, (Ptr{Cdouble}, Cuint, Ptr{Cdouble}, Cuint, Cdouble, Cdouble), E, len, C, pNgauss, Lambda, epsilon)
-    ot = transpose(copy(unsafe_wrap(Array, otr, (len, 4), own=false)))
-    invT = Array{ComplexF64}(undef, 4, len)
+    ot = permutedims(copy(unsafe_wrap(Array, otr, (len, 3, 3), own=false)), (3, 2, 1))
+    invT = Array{ComplexF64}(undef, 3, 3, len)
     function ρ(e, i)
         if e <= delta[i]
             return 0
@@ -84,27 +84,24 @@ function imT(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, epsil
         return k / 8 / pi / e
     end
     for i in 1:len
-        m = [ot[1, i] ot[2, i]; ot[3, i] ot[4, i]]
+        # m = [ot[1, i] ot[2, i]; ot[3, i] ot[4, i]]
+        m = ot[:, :, i]
         if abs(det(m)) < 1e-8
-            invT[1, i] = 0
-            invT[2, i] = 0
-            invT[3, i] = 0
-            invT[4, i] = 0
+            invT[:, :, i] .= 0
             continue
         end
         invm = inv(m)
-        invT[1, i] = invm[1, 1]
-        invT[2, i] = invm[1, 2]
-        invT[3, i] = invm[2, 1]
-        invT[4, i] = invm[2, 2]
+        invT[:, :, i] = invm
     end
     plot(dpi=400, legend=:topleft)
-    plot!(E, imag.(invT[1, :]), label="Im " * L"T_{11}", lw=1.0, alpha=0.7)
+    plot!(E, imag.(invT[1, 1, :]), label="Im " * L"T_{11}", lw=1.0, alpha=0.7)
     # plot!(E, imag.(invT[2, :]), label="Im "*L"T^{-1}_{12}")
     # plot!(E, imag.(invT[3, :]), label="Im "*L"T^{-1}_{21}")
-    plot!(E, imag.(invT[4, :]), label="Im " * L"T_{22}", lw=1.0, alpha=0.7)
+    plot!(E, imag.(invT[2, 2, :]), label="Im " * L"T_{22}", lw=1.0, alpha=0.7)
+    plot!(E, imag.(invT[3, 3, :]), label="Im " * L"T_{33}", lw=1.0, alpha=0.7)
     plot!(E, ρ.(E, 1), label=L"\rho_1(E)\Theta(E-m_B-m_{B^*})", s=:dash, lw=1.5)
-    plot!(E, ρ.(E, 2), label=L"\rho_2(E)\Theta(E-m_{B_s} - m_{B_s^*})", s=:dash, lw=1.5)
+    plot!(E, ρ.(E, 2), label=L"\rho_2(E)\Theta(E-m_{B} - m_{B})", s=:dash, lw=1.5)
+    plot!(E, ρ.(E, 3), label=L"\rho_3(E)\Theta(E-m_{B_s} - m_{B_s^*})", s=:dash, lw=1.5)
     vline!(delta, label="thresholds", s=:dash, c=:grey)
     ylims!(-0.6, 1.5)
     xlabel!("E/GeV")
@@ -115,7 +112,7 @@ end
 
 function imTsing(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, epsilon)
     @time otr = ccall(Libdl.dlsym(libscript, :onshellT_single), Ptr{ComplexF64}, (Ptr{Cdouble}, Cuint, Ptr{Cdouble}, Cuint, Cdouble, Cdouble), E, len, C, pNgauss, Lambda, epsilon)
-    ot = transpose(copy(unsafe_wrap(Array, otr, (len, 2), own=false)))
+    ot = copy(unsafe_wrap(Array, otr, len, own=false))
     invT = inv.(ot)
     function ρ(e, i)
         if e <= delta[i]
@@ -132,8 +129,8 @@ function imTsing(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, e
     p1 = xsqrtleft.(2 * mu[1] .* (E))
     p2 = 0.0006
     v1 = V.(E .+ (m11 + m12), p1, p2)
-    plot(dpi=400, legend=:bottomright)
-    plot!(E, imag.(invT[1, :]), label="Im " * L"T^{-1}_{11}", alpha=0.5, lw=1)
+    plot(dpi=400, legend=:topleft)
+    plot!(E, imag.(invT), label="Im " * L"T^{-1}_{11}", alpha=0.5, lw=1)
     # plot!(E, imag.(invT[2, :]), label="Im "*L"T^{-1}_{12}")
     # plot!(E, imag.(invT[3, :]), label="Im "*L"T^{-1}_{21}")
     # plot!(E, imag.(invT[4, :]), label="Im "*L"T^{-1}_{22}", alpha=0.5, lw=1, s=:dot)
@@ -240,7 +237,7 @@ end
 
 function conshellG(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, epsilon)
     @time otr = ccall(Libdl.dlsym(libscript, :onshellG), Ptr{ComplexF64}, (Ptr{Cdouble}, Cuint, Ptr{Cdouble}, Cuint, Cdouble, Cdouble), E, len, C, pNgauss, Lambda, epsilon)
-    ot = transpose(copy(unsafe_wrap(Array, otr, (len, 4), own=false)))
+    ot = permutedims(copy(unsafe_wrap(Array, otr, (len, 3, 3), own=false)), (3, 2, 1))
     upper = min(1e4, maximum(abs.(ot)))
     level = getEvec(C[1])
     vls = filter(e -> e > E[1] && e < E[end], level)
@@ -249,10 +246,10 @@ function conshellG(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda,
     vline!([m_Xb11P], s=:dash, label=L"\chi_{b1}(1P)")
     vline!([m_Xb12P], s=:dash, label=L"\chi_{b1}(2P)")
     vline!([m_Xb13P], s=:dash, label=L"\chi_{b1}(3P)")
-    plot!(E, abs.(ot[1, :]), label=L"$G_{11}$", dpi=400)
+    plot!(E, abs.(ot[1, 1, :]), label=L"$G_{11}$", dpi=400)
     # plot!(E, imag.(ot[3,:]), label=L"$G_{21}$")
-    plot!(E, abs.(ot[4, :]), label=L"$G_{22}$")
-    plot!(E, abs.(ot[2, :]), label=L"$G_{12}$")
+    plot!(E, abs.(ot[2, 2, :]), label=L"$G_{22}$")
+    plot!(E, abs.(ot[3, 3, :]), label=L"$G_{33}$")
     # ylims!(0, upper)
     xlims!(E[1], E[end])
     # ylims!(0,10)
@@ -299,7 +296,7 @@ end
 
 function detImVG(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, epsilon)
     @time dtr = ccall(Libdl.dlsym(libscript, :Det), Ptr{ComplexF64}, (Ptr{Cdouble}, Cuint, Ptr{Cdouble}, Cuint, Cdouble, Cdouble), E, len, C, pNgauss, Lambda, epsilon)
-    yup = 5e3
+    yup = 3e2
     Det = copy(unsafe_wrap(Array, dtr, len, own=false))
     # plot(E, real.(Det), label=L"det($1-VG$)",dpi=400)
     # level = getEvec(C[1])
@@ -330,12 +327,14 @@ end
 
 function traceG(E::Vector{Cdouble}, len, C::Vector{Cdouble}, pNgauss, Lambda, epsilon)
     @time dtr = ccall(Libdl.dlsym(libscript, :traceG), Ptr{ComplexF64}, (Ptr{Cdouble}, Cuint, Ptr{Cdouble}, Cuint, Cdouble, Cdouble), E, len, C, pNgauss, Lambda, epsilon)
-    trg = transpose(copy(unsafe_wrap(Array, dtr, (len, 2), own=false)))
+    trg = transpose(copy(unsafe_wrap(Array, dtr, (len, 3), own=false)))
     vline(delta, s=:dash, label="thresholds", lw=0.8)
     plot!(E, real.(trg[1, :]), label=L"real G_{11}", dpi=400)
     plot!(E, imag.(trg[1, :]), label=L"imag G_{11}", dpi=400)
     plot!(E, real.(trg[2, :]), label=L"real G_{22}", dpi=400)
     plot!(E, imag.(trg[2, :]), label=L"imag G_{22}", dpi=400)
+    plot!(E, real.(trg[3, :]), label=L"real G_{33}", dpi=400)
+    plot!(E, imag.(trg[3, :]), label=L"imag G_{33}", dpi=400)
     ylims!(-1.5, 0.5)
     savefig("trg.png")
     cfree(reinterpret(Ptr{Cvoid}, dtr))

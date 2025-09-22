@@ -174,11 +174,12 @@ void lse_refresh(LSE *self, double complex E, double C[NCHANNELS * NCHANNELS],
         const double complex dE = E - delta[i];
         const double complex mU = mu[i];
         const double complex tmp = csqrt(2 * mU * dE);
-        if (((rs >> i) & 1) == 1) {
-            self->x0[i] = tmp;
-        } else {
-            self->x0[i] = -(tmp);
-        }
+        // if (((rs >> i) & 1) == 1) {
+        //     self->x0[i] = tmp;
+        // } else {
+        //     self->x0[i] = -(tmp);
+        // }
+        self->x0[i] = tmp;
         for (size_t j = 0; j < N_MAX; j += 1) {
 #ifdef TESTQM
             psi[i][j][self->pNgauss] = psi_test(self->x0[i]);
@@ -481,7 +482,7 @@ int lse_tmat_single(LSE *self) {
     }
     gsl_blas_zgemm(CblasNoTrans, CblasNoTrans, alpha, inv_I_minus_VG, &V.matrix,
                    beta, &T.matrix);
-    self->onshellT[0][0] = gsl_matrix_get(&T.matrix, n - 1, n - 1);
+    self->onshellT[0][0] = gsl_matrix_complex_get(&T.matrix, n - 1, n - 1);
     return GSL_SUCCESS;
 }
 
