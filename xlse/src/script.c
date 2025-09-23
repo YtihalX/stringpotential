@@ -499,7 +499,7 @@ int oTsing(void *arg) {
         ose10[i] = lse->onshellT[1][0];
         ose11[i] = lse->onshellT[1][1];
 #else
-        res[i] = matrix_get(lse->VOME, ngauss, ngauss);
+        res[i] = matrix_get(lse->TOME, ngauss, ngauss);
         // res[i] = lse->onshellT[0][0];
         // size_t idx = ngauss * 2 * (ngauss + 1) + ngauss;
         // ose00[i] = lse->TOME->data[2 * idx] + lse->TOME->data[2 * idx

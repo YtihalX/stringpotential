@@ -23,3 +23,4 @@ papers
 *.pdf
 *compile_commands.json
 *presentation/output
+*.xmake
